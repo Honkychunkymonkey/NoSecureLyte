@@ -1,10 +1,18 @@
 {
   "files": {
+    "config.js": [
+      {
+        "id": "fe225e6d-9cf3-4724-87da-9510f069f710",
+        "line": 1,
+        "version": 31,
+        "index": 0
+      }
+    ],
     "public/index.html": [
       {
         "id": "d0531ef9-7d28-4c07-a8da-db2dd900fb7d",
         "line": 1,
-        "version": 46,
+        "version": 108,
         "index": 0
       }
     ]

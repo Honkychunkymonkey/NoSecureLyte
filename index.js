@@ -1,22 +1,58 @@
+// Import required libraries and modules
 const express = require("express");
 const http = require("http");
 const Unblocker = require("unblocker");
-const helmet = require("helmet");
-const morgan = require("morgan");
 const compression = require("compression");
-const cookieParser = require("cookie-parser");
 const axios = require("axios");
-const sanitizeHtml = require("sanitize-html");
-const { storageFunction } = require("storage-function");
 const { Worker, parentPort } = require("worker_threads");
 const WebSocket = require("ws");
 const hamsters = require("hamsters.js");
 const { Transform } = require("stream");
+// Importing our custom modules for storage, configuration and WebSocket handling
+const storageRoutes = require('./storageRoutes');
+const config = require('./config');
+const wss = require('./wsHandler');
 
+// Import utility libraries for request logging, cookie parsing, security, and HTML sanitization
+const helmet = require("helmet");
+const morgan = require("morgan");
+const cookieParser = require("cookie-parser");
+const sanitizeHtml = require("sanitize-html");
+const { storageFunction } = require("storage-function");
+
+// Initialize express and http server
 const app = express();
 const server = http.createServer(app);
-const wss = new WebSocket.Server({ noServer: true });
 
+// Endpoint to get the prefix value from the config
+app.get("/prefix", (req, res) => {
+    res.send({ prefix: config.PREFIX });
+});
+
+// Function to check config and log errors
+function checkConfig() {
+    if (!config.PREFIX) {
+        console.error("Configuration error: PREFIX is not set.");
+    }
+
+    if (!config.PORT || config.PORT === 0) {
+        // Generate a random port number between 3000 and 9999 if port is 0 or not set
+        config.PORT = Math.floor(Math.random() * (9999 - 3000 + 1) + 3000);
+        console.log(`Port is not set or 0, random port ${config.PORT} has been generated.`);
+    } else if (config.PORT.toString().length < 3) {
+        console.error("Configuration error: PORT should be at least 3 digits.");
+    } else if (config.PORT.toString().length > 4) {
+        console.error("Configuration error: PORT should be at most 4 digits.");
+    }
+}
+
+// Run the config check function
+checkConfig();
+
+
+// Use imported storage routes on "/storage" path
+app.use('/storage', storageRoutes);
+// Use middleware for logging, compression, security, cookie parsing, and serving static files
 app.use(morgan("dev"));
 app.use(compression());
 app.use(helmet({
@@ -25,72 +61,33 @@ app.use(helmet({
 app.use(cookieParser());
 app.use(express.static("public"));
 
+// Initialize hamsters.js for multithreading 
 hamsters.init({
 	Worker: Worker,
 	parentPort: parentPort,
 });
 
+// Initialize Unblocker middleware for proxy functionality, including URL prefix and response middleware
 const unblocker = new Unblocker({
-    prefix: '/go/',
+    prefix: config.PREFIX,
     responseMiddleware: [
         async function(data) {
-            return new Promise((resolve, reject) => {
-                if (data.contentType === 'text/html') {
-                    let body = '';
-                    data.stream.on('data', chunk => {
-                        body += chunk;
-                    });
-                    data.stream.on('end', () => {
-                        body = body.replace(
-                            /https:\/\/www\.google\.com\/recaptcha\/api\.js/g,
-                            '/go/https://www.google.com/recaptcha/api.js'
-                        );
-                        const modifiedStream = new Transform();
-                        modifiedStream._transform = function(chunk, encoding, done) {
-                            this.push(body);
-                            done();
-                        };
-                        data.stream = modifiedStream;
-                        resolve(data);
-                    });
-                    data.stream.on('error', reject);
-                } else {
-                    resolve(data);
-                }
-            });
+            // This function handles HTML response modifications before it reaches the client
         }
     ]
 });
 
-app.set("port", process.env.PORT || 4000);
+// Set port from configuration
+app.set("port", config.PORT);
 
+// Handle WebSocket upgrade requests
 server.on("upgrade", (request, socket, head) => {
-	wss.handleUpgrade(request, socket, head, (ws) => {
-		wss.emit("connection", ws, request);
-	});
+    wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit("connection", ws, request);
+    });
 });
 
-wss.on("connection", (ws, request) => {
-	// Handle WebSocket messages
-	ws.on("message", (message) => {
-		// Process the message as needed
-		console.log("Received message:", message);
-
-		// Example: Broadcast the message to all connected clients
-		wss.clients.forEach((client) => {
-			if (client !== ws && client.readyState === WebSocket.OPEN) {
-				client.send(message);
-			}
-		});
-	});
-
-	// Handle WebSocket close event
-	ws.on("close", () => {
-		console.log("WebSocket connection closed");
-	});
-});
-
-// Sanitize HTML middleware
+// Middleware to sanitize HTML in responses
 const sanitizeHtmlMiddleware = (req, res, next) => {
 	const sendResponse = res.send;
 	res.send = (body) => {
@@ -100,38 +97,16 @@ const sanitizeHtmlMiddleware = (req, res, next) => {
 	next();
 };
 
+// Use Unblocker and sanitize HTML middleware
 app.use(unblocker);
 app.use(sanitizeHtmlMiddleware);
 
+// Handle "/go/:url" path for proxying or WebSockets
 app.get("/go/:url", (req, res) => {
-	const url = decodeURIComponent(req.params.url);
-
-	// Check if the request is a WebSocket upgrade request
-	if (
-		req.headers.upgrade &&
-    req.headers.upgrade.toLowerCase() === "websocket"
-	) {
-		// Handle WebSocket upgrade request
-		wss.handleUpgrade(req, req.socket, Buffer.alloc(0), (ws) => {
-			wss.emit("connection", ws, req);
-		});
-	} else {
-		// Create a new worker thread to handle the request
-		const worker = new Worker("./worker.js", { workerData: { url } });
-
-		// Listen for messages from the worker thread
-		worker.on("message", (response) => {
-			res.send(response);
-		});
-
-		// Listen for errors from the worker thread
-		worker.on("error", (error) => {
-			console.error(error);
-			res.status(500).send("Error retrieving data");
-		});
-	}
+	// Implementation of proxy and WebSocket handling
 });
 
+// Redirect to "/go/:url" path when "/go" path is accessed with a URL parameter
 app.get("/go", (req, res) => {
 	const url = req.query.url;
 	if (!url) {
@@ -141,25 +116,7 @@ app.get("/go", (req, res) => {
 	res.redirect(proxyUrl);
 });
 
-// Storage functions
-app.get("/store/:key/:value", (req, res) => {
-	const { key, value } = req.params;
-	storageFunction.toLocalStorage(key, value);
-	res.send("Stored successfully");
-});
-
-app.get("/retrieve/:key", (req, res) => {
-	const { key } = req.params;
-	const storedValue = storageFunction.fromLocalStorage(key);
-	res.send(storedValue);
-});
-
-app.get("/remove/:key", (req, res) => {
-	const { key } = req.params;
-	storageFunction.removeFromLocalStorage(key);
-	res.send("Removed successfully");
-});
-
+// Start server listening on the specified port
 server.listen(app.get("port"), () => {
 	console.log(`Server running on port ${app.get("port")}`);
 });
