@@ -1,0 +1,42 @@
+body {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background-color: #343a40; /* Dark background */
+  color: #fff; /* White text */
+  font-family: "Helvetica Now", Arial, sans-serif;
+}
+#plus-btn {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  font-size: 2rem;
+  cursor: pointer;
+  transition: transform 0.3s ease;
+}
+
+#plus-btn:hover {
+  transform: scale(1.2);
+}
+
+#tooltip-text {
+  display: none;
+  width: 150px; /* reduce the width of the tooltip */
+  background-color: #333;
+  color: #fff;
+  text-align: center;
+  padding: 5px 0;
+  border-radius: 6px;
+  position: absolute;
+  z-index: 1;
+  top: 125%;
+  right: -50px; /* position tooltip relative to the right of the plus button */
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+#plus-btn:hover #tooltip-text {
+  display: block;
+  opacity: 1;
+}

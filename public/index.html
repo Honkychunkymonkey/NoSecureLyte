@@ -9,22 +9,16 @@
       integrity="sha384-KK94CHFLLe+nY2dmCWGMq91rCGa5gtU4mk92HdvYe+M/SXH301p5ILy+dN9+nJOZ"
       crossorigin="anonymous"
     />
-    <style>
-      body {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100vh;
-      }
-      .globe-icon {
-        font-size: 400rem; /* Adjust the size as per your preference */
-      }
-    </style>
+    <link rel="stylesheet" href="/styles.css" />
   </head>
-  <body>
+  <body class="text-light bg-dark">
+    <div id="plus-btn">
+      <span id="tooltip-text">Some more of my works</span>
+      +
+    </div>
+
     <div class="container">
       <div class="text-center">
-        
         <h1 class="display-4">Web Proxy</h1>
       </div>
       <form id="form" class="d-flex justify-content-center">
@@ -44,24 +38,6 @@
       integrity="sha384-ENjdO4Dr2bkBIFxQpeoTz1HIcje39Wm4jDKdf19U8gI4ddQ3GYNS7NTKfAdVQSZe"
       crossorigin="anonymous"
     ></script>
-    <script>
-window.onload = async function() {
-  const response = await fetch('/prefix');
-  const data = await response.json();
-  const PREFIX = data.prefix;
-
-  const form = document.getElementById("form");
-  const resultDiv = document.getElementById("result");
-
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const url = form.url.value;
-    const encodedUrl = encodeURIComponent(url); // use encodeURIComponent to properly encode the URL
-    const proxyUrl = `${PREFIX}${encodedUrl}`;
-    window.open(proxyUrl, "_blank"); // use window.open to open in a new tab
-  });
-}
-</script>
-
+    <script src="/pFrontend.js"></script>
   </body>
 </html>
