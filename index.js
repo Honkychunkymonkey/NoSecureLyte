@@ -3,11 +3,10 @@ const express = require("express");
 const http = require("http");
 const Unblocker = require("unblocker");
 const compression = require("compression");
-const axios = require("axios");
-const { Worker, parentPort } = require("worker_threads");
+const cluster = require('cluster');
+const numCPUs = require('os').cpus().length;
 const WebSocket = require("ws");
-const hamsters = require("hamsters.js");
-const { Transform } = require("stream");
+
 // Importing our custom modules for storage, configuration and WebSocket handling
 const storageRoutes = require("./storageRoutes");
 const config = require("./config");
@@ -20,10 +19,31 @@ const cookieParser = require("cookie-parser");
 const sanitizeHtml = require("sanitize-html");
 const { storageFunction } = require("storage-function");
 
+// Declare Unblocker Middleware
+var urlPrefixer = Unblocker.urlPrefixer;
+var redirects = Unblocker.redirects;
+var cookies = Unblocker.cookies;
+var hsts = Unblocker.hsts;
+var hpkp = Unblocker.hpkp;
+var csp = Unblocker.csp;
+
 // Initialize express and http server
 const app = express();
 const server = http.createServer(app);
 
+if (cluster.isMaster) {
+  console.log(`Master ${process.pid} is running`);
+
+  // Fork workers.
+  for (let i = 0; i < numCPUs; i++) {
+    cluster.fork();
+  }
+
+  cluster.on('exit', (worker, code, signal) => {
+    console.log(`worker ${worker.process.pid} died`);
+  });
+} else {
+  
 // Endpoint to get the prefix value from the config
 app.get("/prefix", (req, res) => {
   res.send({ prefix: config.PREFIX });
@@ -64,19 +84,19 @@ app.use(
 app.use(cookieParser());
 app.use(express.static("public"));
 
-// Initialize hamsters.js for multithreading
-hamsters.init({
-  Worker: Worker,
-  parentPort: parentPort,
-});
-
 // Initialize Unblocker middleware for proxy functionality, including URL prefix and response middleware
 const unblocker = new Unblocker({
   prefix: config.PREFIX,
+  requestMiddleware:[
+    cookies.handleRequest
+  ],
   responseMiddleware: [
-    async function (data) {
-      // This function handles HTML response modifications before it reaches the client
-    },
+      urlPrefixer,
+      redirects,
+      cookies.handleResponse,
+      hsts,
+      hpkp,
+      csp
   ],
 });
 
@@ -123,3 +143,5 @@ app.get("/go", (req, res) => {
 server.listen(app.get("port"), () => {
   console.log(`Server running on port ${app.get("port")}`);
 });
+console.log(`Worker ${process.pid} started`);
+}
