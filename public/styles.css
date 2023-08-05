@@ -1,7 +1,7 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap");
 
 body {
-  font-family: 'Poppins', sans-serif;
+  font-family: "Poppins", sans-serif;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -24,7 +24,7 @@ body {
 }
 
 #tooltip-text {
-  font-family: 'Poppins', sans-serif;
+  font-family: "Poppins", sans-serif;
   display: none;
   width: 150px; /* reduce the width of the tooltip */
   background-color: #333;
