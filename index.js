@@ -5,7 +5,6 @@ const Unblocker = require("unblocker");
 const compression = require("compression");
 const cluster = require("cluster");
 const numCPUs = require("os").cpus().length;
-const WebSocket = require("ws");
 // Importing our custom modules for storage, configuration and WebSocket handling
 const storageRoutes = require("./storageRoutes");
 const config = require("./config");
